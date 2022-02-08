@@ -38,11 +38,11 @@ public class MainApplication
     System.loadLibrary("comm_jni_module");
   }
 
-  Map<Boolean, List<Package>> expoPackages =
+  Map<Boolean, List<Package>> expoPackagesPartitioning =
       ExpoModulesPackageList.getPackageList().stream().collect(
           Collectors.partitioningBy(
               expoPackage -> (expoPackage instanceof SecureStorePackage)));
-  private final ReactModuleRegistryProvider expoPackageModuleRegistryProvider =
+  private final ReactModuleRegistryProvider reactNativeModuleRegistryProvider =
       new ReactModuleRegistryProvider(expoPackages.get(false));
   private final ReactModuleRegistryProvider secureStoreModuleRegistryProvider =
       new ReactModuleRegistryProvider(expoPackages.get(true));
@@ -57,25 +57,23 @@ public class MainApplication
         @Override
         protected List<ReactPackage> getPackages() {
           @SuppressWarnings("UnnecessaryLocalVariable")
-          List<ReactPackage> packages = new PackageList(this).getPackages();
-          List<ReactPackage> manuallyLinkedPackages =
-              packages.stream()
+          List<ReactPackage> allPackages = new PackageList(this).getPackages();
+          List<ReactPackage> reactNativePackages =
+              allPackages.stream()
                   .filter(
                       reactPackage
                       -> !(reactPackage instanceof ExpoModulesPackage))
                   .collect(Collectors.toList());
-          manuallyLinkedPackages.add(new RNFirebaseMessagingPackage());
-          manuallyLinkedPackages.add(new RNFirebaseNotificationsPackage());
-          manuallyLinkedPackages.add(
+          reactNativePackages.add(new RNFirebaseMessagingPackage());
+          reactNativePackages.add(new RNFirebaseNotificationsPackage());
+          reactNativePackages.add(
               new KeyboardInputPackage(this.getApplication()));
-          manuallyLinkedPackages.add(new CommPackage());
+          reactNativePackages.add(new CommPackage());
 
-          ModuleRegistryAdapter expoPackageAdapter =
-              new ModuleRegistryAdapter(expoPackageModuleRegistryProvider);
-          ModuleRegistryAdapter secureStoreAdapter =
-              new ModuleRegistryAdapter(secureStoreModuleRegistryProvider);
-          manuallyLinkedPackages.add(expoPackageAdapter);
-          return manuallyLinkedPackages;
+          ModuleRegistryAdapter reactNativeModuleRegistryAdapter =
+              new ModuleRegistryAdapter(reactNativeModuleRegistryProvider);
+          reactNativePackages.add(reactNativeModuleRegistryAdapter);
+          return reactNativePackages;
         }
 
         @Override
