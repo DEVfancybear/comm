@@ -17,16 +17,19 @@ import com.wix.reactnativekeyboardinput.KeyboardInputPackage;
 import expo.modules.ApplicationLifecycleDispatcher;
 import expo.modules.ExpoModulesPackage;
 import expo.modules.ExpoModulesPackageList;
-import expo.modules.ModuleRegistryAdapter;
-import expo.modules.ReactModuleRegistyrProvider;
 import expo.modules.ReactNativeHostWrapper;
+import expo.modules.adapters.react.ModuleRegistryAdapter;
+import expo.modules.adapters.react.ReactModuleRegistryProvider;
+import expo.modules.core.interfaces.Package;
 import expo.modules.securestore.SecureStoreModule;
+import expo.modules.securestore.SecureStorePackage;
 import io.invertase.firebase.messaging.RNFirebaseMessagingPackage;
 import io.invertase.firebase.notifications.RNFirebaseNotificationsPackage;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.security.Security;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 public class MainApplication
     extends MultiDexApplication implements ReactApplication {
@@ -35,8 +38,14 @@ public class MainApplication
     System.loadLibrary("comm_jni_module");
   }
 
-  private final ReactModuleRegistryProvider moduleRegistryProvider =
-      new ReactModuleRegistryProvider(ExpoModulesPackageList.getPackageList());
+  Map<Boolean, List<Package>> expoPackages =
+      ExpoModulesPackageList.getPackageList().stream().collect(
+          Collectors.partitioningBy(
+              expoPackage -> (expoPackage instanceof SecureStorePackage)));
+  private final ReactModuleRegistryProvider expoPackageModuleRegistryProvider =
+      new ReactModuleRegistryProvider(expoPackages.get(false));
+  private final ReactModuleRegistryProvider secureStoreModuleRegistryProvider =
+      new ReactModuleRegistryProvider(expoPackages.get(true));
 
   private final ReactNativeHost mReactNativeHost =
       new ReactNativeHostWrapper(this, new ReactNativeHost(this) {
@@ -51,7 +60,9 @@ public class MainApplication
           List<ReactPackage> packages = new PackageList(this).getPackages();
           List<ReactPackage> manuallyLinkedPackages =
               packages.stream()
-                  .filter(!reactPackage instanceof ExpoModulesPackage)
+                  .filter(
+                      reactPackage
+                      -> !(reactPackage instanceof ExpoModulesPackage))
                   .collect(Collectors.toList());
           manuallyLinkedPackages.add(new RNFirebaseMessagingPackage());
           manuallyLinkedPackages.add(new RNFirebaseNotificationsPackage());
@@ -59,9 +70,11 @@ public class MainApplication
               new KeyboardInputPackage(this.getApplication()));
           manuallyLinkedPackages.add(new CommPackage());
 
-          ModuleRegistryAdapter adapter = new ModuleRegistryAdapter(
-              moduleProvider, new ExpoModulesPackageList());
-          manuallyLinkedPackages.add(adapter);
+          ModuleRegistryAdapter expoPackageAdapter =
+              new ModuleRegistryAdapter(expoPackageModuleRegistryProvider);
+          ModuleRegistryAdapter secureStoreAdapter =
+              new ModuleRegistryAdapter(secureStoreModuleRegistryProvider);
+          manuallyLinkedPackages.add(expoPackageAdapter);
           return manuallyLinkedPackages;
         }
 
@@ -73,9 +86,10 @@ public class MainApplication
         @Override
         protected JSIModulePackage getJSIModulePackage() {
           SecureStoreModule secureStoreModule =
-              (SecureStoreModule)moduleRegistryProvider
-                  .get(getApplicationContext())
-                  .getExportedModuleOfClass(SecureStoreModule.class);
+              (SecureStoreModule)(secureStoreModuleRegistryProvider
+                                      .get(getApplicationContext())
+                                      .getExportedModuleOfClass(
+                                          SecureStoreModule.class));
           CommSecureStore.getInstance().initialize(secureStoreModule);
           return new CommCoreJSIModulePackage();
         }
